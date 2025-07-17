@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Edit3, Bot, CheckCircle, ArrowRight } from "lucide-react";
@@ -8,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/hooks/use-toast";
+import { editDraft } from "@/api/rtiapi"; // 👈 FASTAPI CALL
 
 interface EditDraftPageProps {
   draftData: any;
@@ -38,24 +38,27 @@ const EditDraftPage = ({ draftData, setDraftData }: EditDraftPageProps) => {
     }
 
     setIsProcessing(true);
-    
+
     try {
-      // Simulate API call to /edit-draft
-      setTimeout(() => {
-        const improvedDraft = `${currentDraft}\n\nAI Enhancement: ${aiInstruction}`;
-        setCurrentDraft(improvedDraft);
-        setIsProcessing(false);
-        toast({
-          title: "Draft Updated",
-          description: "AI has successfully improved your draft",
-        });
-      }, 2000);
+      const response = await editDraft({
+  instruction: aiInstruction,
+  language,
+  current_draft: draftData[language]
+});
+
+
+      setCurrentDraft(response.data.edited_draft || '');
+      toast({
+        title: "Draft Improved",
+        description: "AI successfully enhanced your draft.",
+      });
     } catch (error) {
       toast({
         title: "Edit Failed",
-        description: "Please try again later",
+        description: "Server error or bad request",
         variant: "destructive"
       });
+    } finally {
       setIsProcessing(false);
     }
   };
@@ -102,7 +105,7 @@ const EditDraftPage = ({ draftData, setDraftData }: EditDraftPageProps) => {
         </p>
       </div>
 
-      {/* Edit Mode Selection */}
+      {/* Edit Mode Cards */}
       <div className="grid md:grid-cols-3 gap-6 mb-8">
         <EditModeCard
           mode="manual"
@@ -112,7 +115,6 @@ const EditDraftPage = ({ draftData, setDraftData }: EditDraftPageProps) => {
           isSelected={editMode === 'manual'}
           onClick={() => setEditMode('manual')}
         />
-        
         <EditModeCard
           mode="ai"
           icon={Bot}
@@ -121,7 +123,6 @@ const EditDraftPage = ({ draftData, setDraftData }: EditDraftPageProps) => {
           isSelected={editMode === 'ai'}
           onClick={() => setEditMode('ai')}
         />
-        
         <EditModeCard
           mode="asis"
           icon={CheckCircle}
@@ -132,7 +133,7 @@ const EditDraftPage = ({ draftData, setDraftData }: EditDraftPageProps) => {
         />
       </div>
 
-      {/* Content Area */}
+      {/* Editor Section */}
       <Card className="bg-white/70 backdrop-blur-sm border-0 shadow-xl mb-8">
         <CardHeader>
           <div className="flex items-center justify-between">
@@ -147,40 +148,36 @@ const EditDraftPage = ({ draftData, setDraftData }: EditDraftPageProps) => {
         </CardHeader>
         <CardContent className="space-y-6">
           {editMode === 'manual' && (
-            <div>
-              <Textarea
-                value={currentDraft}
-                onChange={(e) => setCurrentDraft(e.target.value)}
-                className="min-h-80 border-slate-300 focus:border-purple-400 rounded-xl"
-                placeholder="Edit your RTI draft here..."
-              />
-            </div>
+            <Textarea
+              value={currentDraft}
+              onChange={(e) => setCurrentDraft(e.target.value)}
+              className="min-h-80 border-slate-300 focus:border-purple-400 rounded-xl"
+              placeholder="Edit your RTI draft here..."
+            />
           )}
 
           {editMode === 'ai' && (
             <div className="space-y-4">
-              <div>
-                <Input
-                  value={aiInstruction}
-                  onChange={(e) => setAiInstruction(e.target.value)}
-                  placeholder="e.g., Make it more formal, add specific dates, include legal references..."
-                  className="border-slate-300 focus:border-purple-400 rounded-xl"
-                />
-                <Button
-                  onClick={handleAIEdit}
-                  disabled={isProcessing}
-                  className="mt-3 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white rounded-xl"
-                >
-                  {isProcessing ? (
-                    <div className="flex items-center space-x-2">
-                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
-                      <span>Processing...</span>
-                    </div>
-                  ) : (
-                    "Improve with AI"
-                  )}
-                </Button>
-              </div>
+              <Input
+                value={aiInstruction}
+                onChange={(e) => setAiInstruction(e.target.value)}
+                placeholder="e.g., Add details, make it formal, translate..."
+                className="border-slate-300 focus:border-purple-400 rounded-xl"
+              />
+              <Button
+                onClick={handleAIEdit}
+                disabled={isProcessing}
+                className="mt-3 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white rounded-xl"
+              >
+                {isProcessing ? (
+                  <div className="flex items-center space-x-2">
+                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                    <span>Processing...</span>
+                  </div>
+                ) : (
+                  "Improve with AI"
+                )}
+              </Button>
               <div className="bg-slate-50 rounded-xl p-4 max-h-80 overflow-y-auto">
                 <pre className="whitespace-pre-wrap text-slate-700 leading-relaxed font-sans">
                   {currentDraft}
@@ -213,3 +210,4 @@ const EditDraftPage = ({ draftData, setDraftData }: EditDraftPageProps) => {
 };
 
 export default EditDraftPage;
+

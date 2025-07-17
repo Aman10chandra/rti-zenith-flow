@@ -1,45 +1,33 @@
-
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Download, Calendar, Building, Languages, MapPin, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/hooks/use-toast";
+import { getRTIList, downloadRTI, findOffices } from "@/api/rtiapi"; // ✅ API integration
 
 const RTIDashboard = () => {
   const [locationSearch, setLocationSearch] = useState('');
-  
-  // Mock RTI data
-  const rtis = [
-    {
-      id: 1,
-      filename: "education_budget_rti_2024.pdf",
-      timestamp: "2024-01-15",
-      language: "English",
-      department: "Ministry of Education",
-      status: "Submitted",
-      responseStatus: "Pending"
-    },
-    {
-      id: 2,
-      filename: "health_scheme_rti_2024.pdf",
-      timestamp: "2024-01-10",
-      language: "Hindi",
-      department: "Ministry of Health",
-      status: "Submitted",
-      responseStatus: "Received"
-    },
-    {
-      id: 3,
-      filename: "infrastructure_rti_2023.pdf",
-      timestamp: "2023-12-20",
-      language: "English",
-      department: "Ministry of Railways",
-      status: "Submitted",
-      responseStatus: "Overdue"
-    }
-  ];
+  const [rtiList, setRtiList] = useState<any[]>([]);
+  const [offices, setOffices] = useState<string[]>([]);
+
+  useEffect(() => {
+    const loadRTIs = async () => {
+      try {
+        const response = await getRTIList();
+        setRtiList(response.data.rtis);
+      } catch (err) {
+        toast({
+          title: "Error",
+          description: "Failed to load RTI data",
+          variant: "destructive"
+        });
+      }
+    };
+
+    loadRTIs();
+  }, []);
 
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
@@ -50,15 +38,29 @@ const RTIDashboard = () => {
     }
   };
 
-  const handleDownload = (filename: string) => {
-    // Simulate download API call to /rtis/{filename}
-    toast({
-      title: "Download Started",
-      description: `Downloading ${filename}`,
-    });
+  const handleDownload = async (filename: string) => {
+    try {
+      const response = await downloadRTI(filename);
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", filename);
+      document.body.appendChild(link);
+      link.click();
+      toast({
+        title: "Download Started",
+        description: `Downloading ${filename}`,
+      });
+    } catch (error) {
+      toast({
+        title: "Download Failed",
+        description: "Could not download the file",
+        variant: "destructive"
+      });
+    }
   };
 
-  const handleFindOffices = () => {
+  const handleFindOffices = async () => {
     if (!locationSearch.trim()) {
       toast({
         title: "Enter Location",
@@ -67,12 +69,21 @@ const RTIDashboard = () => {
       });
       return;
     }
-    
-    // Simulate API call to /find-offices
-    toast({
-      title: "Finding Offices",
-      description: `Searching for RTI offices near ${locationSearch}`,
-    });
+
+    try {
+      const response = await findOffices(locationSearch);
+      setOffices(response.data.offices || []);
+      toast({
+        title: "Offices Found",
+        description: `Showing RTI offices near ${locationSearch}`,
+      });
+    } catch (error) {
+      toast({
+        title: "Search Failed",
+        description: "No RTI offices found",
+        variant: "destructive"
+      });
+    }
   };
 
   return (
@@ -86,7 +97,7 @@ const RTIDashboard = () => {
             Track and manage your RTI applications
           </p>
         </div>
-        
+
         <Button
           onClick={() => window.location.href = '/'}
           className="mt-4 md:mt-0 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white rounded-xl shadow-lg"
@@ -122,12 +133,19 @@ const RTIDashboard = () => {
           <p className="text-sm text-slate-500 mt-2">
             Use this to find RTI offices when no response is received within 30 days
           </p>
+          {offices.length > 0 && (
+            <ul className="mt-2 text-sm text-slate-600 list-disc list-inside">
+              {offices.map((office, i) => (
+                <li key={i}>{office}</li>
+              ))}
+            </ul>
+          )}
         </CardContent>
       </Card>
 
       {/* RTI Applications Grid */}
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {rtis.map((rti) => (
+        {rtiList.map((rti) => (
           <Card key={rti.id} className="bg-white/70 backdrop-blur-sm border-0 shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105">
             <CardHeader className="pb-3">
               <div className="flex items-start justify-between">
@@ -139,25 +157,25 @@ const RTIDashboard = () => {
                 </Badge>
               </div>
             </CardHeader>
-            
+
             <CardContent className="space-y-3">
               <div className="space-y-2 text-sm">
                 <div className="flex items-center space-x-2">
                   <Calendar className="h-4 w-4 text-slate-500" />
                   <span className="text-slate-600">{new Date(rti.timestamp).toLocaleDateString()}</span>
                 </div>
-                
+
                 <div className="flex items-center space-x-2">
                   <Building className="h-4 w-4 text-slate-500" />
                   <span className="text-slate-600 text-xs">{rti.department}</span>
                 </div>
-                
+
                 <div className="flex items-center space-x-2">
                   <Languages className="h-4 w-4 text-slate-500" />
                   <span className="text-slate-600">{rti.language}</span>
                 </div>
               </div>
-              
+
               <Button
                 onClick={() => handleDownload(rti.filename)}
                 variant="outline"
@@ -172,7 +190,7 @@ const RTIDashboard = () => {
         ))}
       </div>
 
-      {rtis.length === 0 && (
+      {rtiList.length === 0 && (
         <Card className="bg-white/70 backdrop-blur-sm border-0 shadow-xl">
           <CardContent className="text-center py-12">
             <div className="text-slate-400 mb-4">

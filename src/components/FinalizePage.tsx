@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Send, Mail, MapPin, Languages, ChevronDown, ChevronUp } from "lucide-react";
@@ -7,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "@/hooks/use-toast";
+import { finalizeRTI } from "@/api/rtiapi"; // Ensure this path is correct
 
 interface FinalizePageProps {
   draftData: any;
@@ -27,23 +27,36 @@ const FinalizePage = ({ draftData }: FinalizePageProps) => {
 
   const handleSubmit = async () => {
     setIsSending(true);
-    
+
     try {
-      // Simulate API call to /finalize-and-send
-      setTimeout(() => {
+      const response = await finalizeRTI({
+        content: draftData[language],
+        language,
+        email: pioEmail,
+        location,
+        department: draftData.department || "General Department"
+      });
+
+      if (response.status === 200) {
         toast({
           title: "RTI Submitted Successfully!",
           description: "Your RTI has been sent. Reminder set for 30 days.",
         });
-        setIsSending(false);
         navigate('/dashboard');
-      }, 2000);
+      } else {
+        toast({
+          title: "Submission Failed",
+          description: "Unexpected response from server.",
+          variant: "destructive"
+        });
+      }
     } catch (error) {
       toast({
         title: "Submission Failed",
         description: "Please try again later",
         variant: "destructive"
       });
+    } finally {
       setIsSending(false);
     }
   };
@@ -60,7 +73,6 @@ const FinalizePage = ({ draftData }: FinalizePageProps) => {
       </div>
 
       <div className="grid lg:grid-cols-3 gap-6">
-        {/* Preview Card */}
         <div className="lg:col-span-2">
           <Card className="bg-white/70 backdrop-blur-sm border-0 shadow-xl">
             <CardHeader>
@@ -85,7 +97,7 @@ const FinalizePage = ({ draftData }: FinalizePageProps) => {
                   {draftData[language]}
                 </pre>
               </div>
-              
+
               <div className="mt-4 flex items-center space-x-2">
                 <Languages className="h-4 w-4 text-slate-600" />
                 <span className="text-sm text-slate-600">Language:</span>
@@ -106,7 +118,6 @@ const FinalizePage = ({ draftData }: FinalizePageProps) => {
           </Card>
         </div>
 
-        {/* Submission Form */}
         <div className="space-y-6">
           <Card className="bg-white/70 backdrop-blur-sm border-0 shadow-xl">
             <CardHeader>

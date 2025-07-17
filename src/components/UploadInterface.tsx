@@ -7,6 +7,9 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "@/hooks/use-toast";
+import { analyzeFromUpload, analyzeFromUrl} from '@/api/rtiapi'
+
+
 
 interface UploadInterfaceProps {
   setAnalysisData: (data: any) => void;
@@ -66,65 +69,61 @@ const UploadInterface = ({ setAnalysisData }: UploadInterfaceProps) => {
     }
   };
 
-  const handleAnalyze = async () => {
-    if (!department || !fiscalYear) {
-      toast({
-        title: "Missing Information",
-        description: "Please select department and fiscal year",
-        variant: "destructive"
-      });
-      return;
+const handleAnalyze = async () => {
+  if (!department || !fiscalYear) {
+    toast({
+      title: "Missing Information",
+      description: "Please select department and fiscal year",
+      variant: "destructive"
+    });
+    return;
+  }
+
+  if (uploadMethod === 'file' && !file) {
+    toast({
+      title: "No File Selected",
+      description: "Please upload a PDF file",
+      variant: "destructive"
+    });
+    return;
+  }
+
+  if (uploadMethod === 'url' && !url) {
+    toast({
+      title: "No URL Provided",
+      description: "Please enter a government URL",
+      variant: "destructive"
+    });
+    return;
+  }
+
+  setIsLoading(true);
+
+  try {
+    let result;
+    if (uploadMethod === 'file') {
+      result = await analyzeFromUpload(file as File, department, fiscalYear);
+    } else {
+      result = await analyzeFromUrl(url, department, fiscalYear);
     }
 
-    if (uploadMethod === 'file' && !file) {
-      toast({
-        title: "No File Selected",
-        description: "Please upload a PDF file",
-        variant: "destructive"
-      });
-      return;
-    }
+    // Save to state and localStorage
+    setAnalysisData(result);
+    localStorage.setItem("gap-analysis", JSON.stringify(result));
 
-    if (uploadMethod === 'url' && !url) {
-      toast({
-        title: "No URL Provided",
-        description: "Please enter a government URL",
-        variant: "destructive"
-      });
-      return;
-    }
+    navigate('/analysis');
+  } catch (error) {
+    console.error("API error:", error);
+    toast({
+      title: "Analysis Failed",
+      description: "Server error or invalid input. Please try again.",
+      variant: "destructive"
+    });
+  } finally {
+    setIsLoading(false);
+  }
+};
 
-    setIsLoading(true);
-
-    try {
-      // Simulate API call
-      setTimeout(() => {
-        const mockAnalysisData = {
-          rawGaps: "Analysis shows gaps in transparency reporting, budget allocation details missing, implementation timeline unclear...",
-          structuredGaps: [
-            { gap: "Budget Allocation Details", category: "Financial", priority: "High" },
-            { gap: "Implementation Timeline", category: "Process", priority: "Medium" },
-            { gap: "Performance Metrics", category: "Monitoring", priority: "High" }
-          ],
-          drafts: {
-            english: "Under the Right to Information Act 2005, I request information regarding...",
-            hindi: "सूचना का अधिकार अधिनियम 2005 के तहत, मैं निम्नलिखित की जानकारी चाहता हूं..."
-          }
-        };
-        
-        setAnalysisData(mockAnalysisData);
-        setIsLoading(false);
-        navigate('/analysis');
-      }, 2000);
-    } catch (error) {
-      toast({
-        title: "Analysis Failed",
-        description: "Please try again later",
-        variant: "destructive"
-      });
-      setIsLoading(false);
-    }
-  };
 
   return (
     <div className="container mx-auto px-4 py-12 max-w-6xl">
